@@ -32,7 +32,7 @@ namespace Process1GBWith256MBLambda
             timer.Start();
 
             context.Logger.LogLine($"{timer.Elapsed}: Getting started.");
-            using var stream = new Cppl.Utilities.AWS.SeekableS3Stream(s3, BUCKET, KEY, 12 * 1024 * 1024, 5);
+            using var stream = await Cppl.Utilities.AWS.SeekableS3Stream.CreateAsync(s3, BUCKET, KEY, 12 * 1024 * 1024, 5);
             using var iso = new CDReader(stream, true);
             using var embedded = iso.OpenFile(ZIPNAME, FileMode.Open, FileAccess.Read);
             using var zip = new ZipArchive(embedded, ZipArchiveMode.Read);

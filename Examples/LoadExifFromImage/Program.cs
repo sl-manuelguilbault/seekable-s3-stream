@@ -22,7 +22,7 @@ namespace SeekableS3Stream.Examples.LoadExifFromImage
             long read = 0L; 
             foreach (var image in images.S3Objects.Where(o => o.Key.EndsWith(".jpg")).Take(10)) {
                 size += image.Size;
-                using var stream = new Cppl.Utilities.AWS.SeekableS3Stream(s3, BUCKET, image.Key, 16 * 1024, 8);
+                using var stream = await Cppl.Utilities.AWS.SeekableS3Stream.CreateAsync(s3, BUCKET, image.Key, 16 * 1024, 8);
                 var directories = ImageMetadataReader.ReadMetadata(stream);
                 read = stream.TotalRead;
                 loaded += stream.TotalLoaded;

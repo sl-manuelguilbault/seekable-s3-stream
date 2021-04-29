@@ -31,25 +31,35 @@ namespace Cppl.Utilities.AWS
             public Dictionary<long, long> HotList = new Dictionary<long, long>(DEFAULT_MAX_PAGE_COUNT);
         }
 
-        MetaData _metadata = null;
-        IAmazonS3 _s3 = null;
+        readonly MetaData _metadata;
+        readonly IAmazonS3 _s3;
 
         public long TotalRead { get; private set; }
         public long TotalLoaded { get; private set; }
 
-        public SeekableS3Stream(IAmazonS3 s3, string bucket, string key, long page = DEFAULT_PAGE_LENGTH, int maxpages = DEFAULT_MAX_PAGE_COUNT)
+        public static async Task<SeekableS3Stream> CreateAsync(
+            IAmazonS3 s3, string bucket, string key, long page = DEFAULT_PAGE_LENGTH, int maxpages = DEFAULT_MAX_PAGE_COUNT,
+            CancellationToken cancellationToken = default)
         {
-            _s3 = s3;
-            _metadata = new MetaData() {
+            var metadata = new MetaData()
+            {
                 Bucket = bucket,
                 Key = key,
                 PageSize = page,
                 MaxPages = maxpages,
             };
 
-            var m = _s3.GetObjectMetadataAsync(_metadata.Bucket, _metadata.Key).GetAwaiter().GetResult();
-            _metadata.Length = m.ContentLength;
-            _metadata.S3eTag = m.ETag;
+            var m = await s3.GetObjectMetadataAsync(metadata.Bucket, metadata.Key, cancellationToken);
+            metadata.Length = m.ContentLength;
+            metadata.S3eTag = m.ETag;
+
+            return new SeekableS3Stream(s3, metadata);
+        }
+
+        private SeekableS3Stream(IAmazonS3 s3, MetaData metadata)
+        {
+            _s3 = s3;
+            _metadata = metadata;
         }
 
         protected override void Dispose(bool disposing) => base.Dispose(disposing);
@@ -65,12 +75,7 @@ namespace Cppl.Utilities.AWS
             set => Seek(value, value >= 0 ? SeekOrigin.Begin : SeekOrigin.End);
         }
 
-        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
-        {
-            return base.ReadAsync(buffer, offset, count, cancellationToken);
-        }
-
-        public override int Read(byte[] buffer, int offset, int count)
+        public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
         {
             if (_metadata.Position < 0 || _metadata.Position >= Length)
                 return 0;
@@ -112,11 +117,11 @@ namespace Cppl.Utilities.AWS
                         _metadata.HotList[i] = 1;
 
                     int read = 0;
-                    using (var r = _s3.GetObjectAsync(go).GetAwaiter().GetResult())
+                    using (var r = await _s3.GetObjectAsync(go, cancellationToken))
                     {
                         do
                         {
-                            read += r.ResponseStream.Read(b, read, b.Length - read);
+                            read += await r.ResponseStream.ReadAsync(b, read, b.Length - read, cancellationToken);
                         } while (read < b.Length);
                     }
                     TotalLoaded += read;
@@ -134,6 +139,11 @@ namespace Cppl.Utilities.AWS
             TotalRead += c;
             _metadata.Position = p;
             return (int)c;
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            return ReadAsync(buffer, offset, count, default).GetAwaiter().GetResult();
         }
 
         public override long Seek(long offset, SeekOrigin origin)

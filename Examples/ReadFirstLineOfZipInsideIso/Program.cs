@@ -20,7 +20,7 @@ namespace SeekableS3Stream.Examples.ReadFirstLineOfZipInsideIso
         {
             var s3 = new AmazonS3Client();
 
-            using var stream = new Cppl.Utilities.AWS.SeekableS3Stream(s3, BUCKET, KEY, 128 * 1024, 12);
+            using var stream = await Cppl.Utilities.AWS.SeekableS3Stream.CreateAsync(s3, BUCKET, KEY, 128 * 1024, 12);
             using var iso = new CDReader(stream, true);
             using var embedded = iso.OpenFile(ZIPNAME, FileMode.Open, FileAccess.Read);
             using var zip = new ZipArchive(embedded);

@@ -15,7 +15,7 @@ namespace SeekableS3Stream.Examples.LoadOneFileFromIso
         {
             var s3 = new AmazonS3Client();
 
-            using var stream = new Cppl.Utilities.AWS.SeekableS3Stream(s3, BUCKET, KEY, 1 * 1024 * 1024, 4);
+            using var stream = await Cppl.Utilities.AWS.SeekableS3Stream.CreateAsync(s3, BUCKET, KEY, 1 * 1024 * 1024, 4);
             using var iso = new CDReader(stream, true);
             using var file = iso.OpenFile(FILENAME, FileMode.Open, FileAccess.Read);
             using var reader = new StreamReader(file);
